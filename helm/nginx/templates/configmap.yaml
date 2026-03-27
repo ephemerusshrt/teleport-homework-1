@@ -1,0 +1,119 @@
+---
+# Static HTML served by nginx
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nginx.fullname" . }}-html
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "nginx.labels" . | nindent 4 }}
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>{{ .Values.staticSite.title }}</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          background: #0d1117;
+          color: #e6edf3;
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .card {
+          background: #161b22;
+          border: 1px solid #30363d;
+          border-radius: 12px;
+          padding: 48px 56px;
+          max-width: 640px;
+          text-align: center;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+        .badge {
+          display: inline-block;
+          background: #1f6feb;
+          color: #fff;
+          font-size: 0.75rem;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          padding: 4px 12px;
+          border-radius: 20px;
+          margin-bottom: 24px;
+        }
+        h1 { font-size: 2rem; font-weight: 700; margin-bottom: 16px; }
+        p  { color: #8b949e; line-height: 1.6; margin-bottom: 12px; }
+        .meta { font-size: 0.8rem; color: #484f58; margin-top: 32px; border-top: 1px solid #21262d; padding-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <span class="badge">Teleport Demo</span>
+        <h1>{{ .Values.staticSite.title }}</h1>
+        <p>{{ .Values.staticSite.body }}</p>
+        <div class="meta">
+          Kubernetes · kubeadm · Helm · cert-manager · Calico
+        </div>
+      </div>
+    </body>
+    </html>
+
+---
+# Custom nginx server config — listens on 8080/8443 (non-root ports)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nginx.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "nginx.labels" . | nindent 4 }}
+data:
+  default.conf: |
+    server {
+        listen {{ .Values.service.httpPort }};
+        server_name _;
+        # Redirect all HTTP → HTTPS
+        return 301 https://$host$request_uri;
+    }
+
+    server {
+        listen {{ .Values.service.httpsPort }} ssl;
+        server_name _;
+
+        ssl_certificate     /etc/nginx/tls/tls.crt;
+        ssl_certificate_key /etc/nginx/tls/tls.key;
+
+        # Modern TLS only
+        ssl_protocols       TLSv1.2 TLSv1.3;
+        ssl_ciphers         ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache   shared:SSL:10m;
+        ssl_session_timeout 1d;
+
+        # Security headers
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+        add_header X-Frame-Options           DENY                                  always;
+        add_header X-Content-Type-Options    nosniff                               always;
+        add_header X-XSS-Protection          "1; mode=block"                       always;
+        add_header Referrer-Policy           "strict-origin-when-cross-origin"     always;
+
+        root  /usr/share/nginx/html;
+        index index.html;
+
+        location / {
+            try_files $uri $uri/ =404;
+        }
+
+        # Health check endpoint — used by NLB health probes
+        location /healthz {
+            access_log off;
+            return 200 "ok\n";
+            add_header Content-Type text/plain;
+        }
+    }

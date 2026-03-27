@@ -1,0 +1,15 @@
+apiVersion: v2
+name: nginx
+description: >
+  Static Nginx site deployed with cert-manager self-signed TLS.
+  Designed to be deployed by a least-privilege RBAC user (not cluster-admin).
+type: application
+version: 0.1.0
+appVersion: "stable"
+keywords:
+  - nginx
+  - tls
+  - cert-manager
+  - kubeadm
+maintainers:
+  - name: teleport-demo

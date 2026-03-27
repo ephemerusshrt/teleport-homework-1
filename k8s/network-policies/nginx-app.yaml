@@ -1,0 +1,58 @@
+# Default-deny all traffic in nginx-app, then allow only what's needed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: nginx-app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Allow NLB → nginx pods on container ports.
+# NLB forwards real client IPs (TCP passthrough), so source is the VPC CIDR.
+# ${VPC_CIDR} is substituted by bootstrap.sh via envsubst at apply time.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-nlb-ingress
+  namespace: nginx-app
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nginx
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: ${VPC_CIDR}
+      ports:
+        - port: 8080
+          protocol: TCP
+        - port: 8443
+          protocol: TCP
+---
+# Allow nginx pods egress to CoreDNS only.
+# cert-manager and the API server are reached by cert-manager's own pods,
+# not by nginx — they run under separate ServiceAccounts with their own policies.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns-and-kube-api
+  namespace: nginx-app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP

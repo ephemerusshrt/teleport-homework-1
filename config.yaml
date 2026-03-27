@@ -1,0 +1,73 @@
+# =============================================================================
+# Central Configuration — All deployment parameters live here.
+# Edit this file only; do NOT modify Terraform or Helm internals directly.
+# =============================================================================
+
+cluster:
+  name: "teleport-demo"
+  kubernetes_version: "1.33"      # APT repo major.minor; patch auto-selected by kubeadm
+  pod_cidr: "192.168.0.0/16"     # Calico default — must not overlap VPC CIDR
+  service_cidr: "10.96.0.0/12"
+  dns_domain: "cluster.local"
+
+aws:
+  region: "us-east-1"
+  availability_zones:
+    - "us-east-1a"
+    - "us-east-1b"
+
+  vpc:
+    cidr: "10.0.0.0/16"
+    public_subnet_cidrs:
+      - "10.0.1.0/24"
+      - "10.0.2.0/24"
+
+  ec2:
+    # Leave key_name empty to use SSM Session Manager exclusively (no open port 22)
+    key_name: ""
+    control_plane:
+      instance_type: "t3.medium"   # Minimum: 2 vCPU / 4 GiB RAM required by kubeadm
+      disk_size_gb: 50
+    workers:
+      instance_type: "t3.medium"
+      disk_size_gb: 50
+      count: 2
+
+  load_balancer:
+    name: "teleport-demo-nlb"     # AWS NLB — TCP passthrough for self-signed TLS
+
+  security_groups:
+    # WARNING: "0.0.0.0/0" exposes port 6443 (kubectl) to the entire internet.
+    # ALWAYS restrict to your office/bastion CIDR before deploying: ["203.0.113.10/32"]
+    allowed_admin_cidrs:
+      - "0.0.0.0/0"
+    nodeport_http: 30080
+    nodeport_https: 30443
+
+nginx:
+  # Docker Hub tag for nginxinc/nginx-unprivileged (runs as uid 101, no root)
+  version: "stable-alpine"
+  replicas: 2
+  site:
+    title: "Teleport Demo"
+    body: "Nginx deployed on Kubernetes via kubeadm — secured with cert-manager self-signed TLS."
+
+calico:
+  # Calico manifest version applied by kubeadm init cloud-init.
+  # Check https://github.com/projectcalico/calico/releases for latest.
+  version: "3.30.0"
+
+cert_manager:
+  version: "v1.17.0"
+
+# RBAC users — each entry drives CSR generation, Role, and RoleBinding creation.
+# cert_expiry_seconds kept short to model Teleport's short-lived certificate approach.
+users:
+  - name: "deploy-user"
+    cn: "deploy-user"
+    org: "deploy-team"
+    namespace: "nginx-app"
+    role: "nginx-deployer"
+    cert_expiry_seconds: 86400    # 24 hours — models Teleport's short-lived cert philosophy.
+    # For development, increase to 604800 (7 days). No auto-renewal — re-run
+    # rbac-csr.sh to rotate before expiry.

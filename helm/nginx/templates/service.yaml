@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nginx.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "nginx.labels" . | nindent 4 }}
+  annotations:
+    # NodePorts are fixed and matched to the NLB target groups in Terraform.
+    # Changing these values requires a matching Terraform change.
+    teleport-demo/nodeport-http:  "{{ .Values.service.nodePortHttp }}"
+    teleport-demo/nodeport-https: "{{ .Values.service.nodePortHttps }}"
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "nginx.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      protocol: TCP
+      port: {{ .Values.service.httpPort }}
+      targetPort: http
+      nodePort: {{ .Values.service.nodePortHttp }}
+    - name: https
+      protocol: TCP
+      port: {{ .Values.service.httpsPort }}
+      targetPort: https
+      nodePort: {{ .Values.service.nodePortHttps }}

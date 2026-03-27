@@ -1,0 +1,62 @@
+# =============================================================================
+# Nginx Helm Chart — Default Values
+# Override per-environment via: helm install -f my-overrides.yaml
+# These defaults are driven by config.yaml through deploy-charts.sh
+# =============================================================================
+
+replicaCount: 2
+
+image:
+  repository: nginxinc/nginx-unprivileged   # Runs as uid 101, no root required
+  tag: "stable-alpine"
+  pullPolicy: Always   # tag "stable-alpine" is mutable; Always ensures freshness on restart
+
+# NodePort values MUST match config.yaml → aws.security_groups.nodeport_*
+# and the NLB target group ports in Terraform.
+service:
+  type: NodePort
+  httpPort: 8080          # Container port (nginx-unprivileged default)
+  httpsPort: 8443         # Container HTTPS port
+  nodePortHttp: 30080     # Fixed NodePort — matched to NLB target group
+  nodePortHttps: 30443    # Fixed NodePort — matched to NLB target group
+
+tls:
+  secretName: nginx-tls   # Created by cert-manager Certificate resource below
+  commonName: "nginx.teleport-demo.local"
+
+certManager:
+  issuerName: "selfsigned-cluster-issuer"
+  issuerKind: "ClusterIssuer"
+  duration: "8760h"       # 1 year
+  renewBefore: "720h"     # 30 days
+
+staticSite:
+  title: "Teleport Demo"
+  body: "Nginx deployed on Kubernetes via kubeadm — secured with cert-manager self-signed TLS."
+
+# Security context — non-root, read-only FS where possible
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 101
+  runAsGroup: 101
+  fsGroup: 101
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false   # nginx writes tmp files; use emptyDir for /tmp
+  capabilities:
+    drop:
+      - ALL
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "128Mi"
+
+# Pod disruption budget — ensure at least 1 pod stays up during rolling updates
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

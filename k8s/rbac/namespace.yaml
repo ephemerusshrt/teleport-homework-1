@@ -1,0 +1,9 @@
+# Created by the admin before handing off to the deploy user.
+# Namespace isolation is the first layer of multi-tenancy.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nginx-app
+  labels:
+    app.kubernetes.io/managed-by: "teleport-demo"
+    environment: "demo"

@@ -1,0 +1,18 @@
+# Binds the deploy user's certificate CN (deploy-user) to the nginx-deployer Role.
+# The CN field in the client certificate IS the Kubernetes username.
+# The O (organization) field in the certificate maps to Kubernetes Groups.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deploy-user-nginx-deployer
+  namespace: nginx-app
+  labels:
+    app.kubernetes.io/managed-by: "teleport-demo"
+subjects:
+  - kind: User
+    name: deploy-user       # Must match the CN= field in the client certificate
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: nginx-deployer
+  apiGroup: rbac.authorization.k8s.io

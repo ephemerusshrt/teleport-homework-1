@@ -1,0 +1,27 @@
+---
+{{- /*
+  Requires cert-manager >= v1.0 (cert-manager.io/v1 is GA since v1.0).
+  Tested with cert-manager v1.17+.
+*/ -}}
+# cert-manager Certificate — requests a self-signed TLS cert from the ClusterIssuer.
+# The resulting Secret ({{ .Values.tls.secretName }}) is mounted into the nginx pod.
+# The ClusterIssuer itself is cluster-scoped and created by the admin in k8s/cert-manager/.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "nginx.fullname" . }}-tls
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "nginx.labels" . | nindent 4 }}
+spec:
+  secretName: {{ .Values.tls.secretName }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  commonName: {{ .Values.tls.commonName | quote }}
+  dnsNames:
+    - {{ .Values.tls.commonName | quote }}
+    - "localhost"
+  issuerRef:
+    name: {{ .Values.certManager.issuerName }}
+    kind: {{ .Values.certManager.issuerKind }}
+    group: cert-manager.io

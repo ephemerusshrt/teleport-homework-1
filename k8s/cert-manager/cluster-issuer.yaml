@@ -1,0 +1,18 @@
+# ---------------------------------------------------------------------------
+# ClusterIssuer: selfsigned-cluster-issuer
+#
+# Cluster-scoped — created by the admin (not the deploy user).
+# Issues self-signed certificates to any namespace.
+#
+# In production: replace with an ACME (Let's Encrypt) or enterprise CA issuer.
+# The Certificate resource in the nginx Helm chart references this issuer by name,
+# so swapping issuers in production requires only a values.yaml change.
+# ---------------------------------------------------------------------------
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-cluster-issuer
+  labels:
+    app.kubernetes.io/managed-by: "teleport-demo"
+spec:
+  selfSigned: {}

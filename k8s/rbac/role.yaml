@@ -1,0 +1,63 @@
+# ---------------------------------------------------------------------------
+# Role: nginx-deployer
+# Namespace-scoped — the deploy user cannot touch anything outside nginx-app.
+# Principle of least privilege: only the verbs and resources required to
+# deploy, update, and monitor the Nginx application are granted.
+#
+# Notable omissions (intentional):
+#   - No cluster-scoped resources (ClusterRole/ClusterRoleBinding)
+#   - No Secrets write access — Helm uses ConfigMap storage driver
+#   - No access to other namespaces
+#   - No node or persistent volume access
+# ---------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nginx-deployer
+  namespace: nginx-app
+  labels:
+    app.kubernetes.io/managed-by: "teleport-demo"
+rules:
+  # Core workload resources
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Pods and observability
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/status"]
+    verbs: ["get", "list", "watch"]
+
+  # Service + ConfigMap (nginx config HTML, nginx server config)
+  - apiGroups: [""]
+    resources: ["services", "configmaps", "endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Helm state — stored as ConfigMaps when --storage-driver=configmap is used
+  # (avoids granting Secrets write access to the deploy user)
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # cert-manager Certificate (namespace-scoped) — deploy user requests a cert;
+  # cert-manager (running as its own ServiceAccount) fulfils it and creates the Secret.
+  # Risk note: deploy-user can request certs but CANNOT sign them — cert-manager
+  # acts under its own identity. No privilege escalation path exists here.
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates", "certificaterequests"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Read the TLS Secret so the deploy user can verify cert issuance
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+
+  # PodDisruptionBudget — allows safe rolling updates
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # ReplicaSet status — needed by kubectl rollout status
+  - apiGroups: ["apps"]
+    resources: ["deployments/rollout", "deployments/scale"]
+    verbs: ["get", "update", "patch"]
