@@ -20,6 +20,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Tee all output to a local log file for post-mortem debugging
+mkdir -p "$REPO_ROOT/scripts/logs"
 BOOTSTRAP_LOG="$REPO_ROOT/scripts/logs/bootstrap.log"
 exec > >(tee -a "$BOOTSTRAP_LOG") 2>&1
 echo "[bootstrap] Logging to $BOOTSTRAP_LOG"
